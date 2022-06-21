@@ -100,17 +100,7 @@ fn run_app<B: Backend>(
         terminal.draw(|f| ui(f, &app, &ctx))?;
         if let Event::Key(key) = event::read()? {
             match key.code {
-                KeyCode::Char('`') => {
-                    if let Event::Key(key) = event::read()? {
-                        match key.code {
-                            KeyCode::Char('w') => {
-                                return Ok(());
-                            }
-                    
-                            _ => {}
-                        }
-                    }
-                }
+              
                 KeyCode::Left => {
                     app.items.unselect();
                     
@@ -122,6 +112,17 @@ fn run_app<B: Backend>(
                 KeyCode::Down => {
                     app.items.next();
                     
+                }
+                KeyCode::Char('`') => {
+                    if let Event::Key(key) = event::read()? {
+                        match key.code {
+                            KeyCode::Char('w') => {
+                                return Ok(());
+                            }
+                    
+                            _ => {}
+                        }
+                    }
                 }
                 _ => {}
               
