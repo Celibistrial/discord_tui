@@ -24,7 +24,7 @@ use tui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Span, Spans, Text},
-    widgets::{Block, Borders, List, ListItem},
+    widgets::{Block, Borders, List, ListItem, ListState,StatefulWidget},
     Frame, Terminal,
 };
 
@@ -69,7 +69,21 @@ fn tui(ctx: Context) -> Result<(), io::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let app = App::default();
+    let mut app = App::default();
+    let mut guild_hm = HashMap::new();
+    let guilds = ctx.cache.guilds();
+    let mut guild_names = vec![];
+
+    for gid in guilds.iter() {
+
+        guild_hm.insert(gid.0, ctx.cache.guild_field(gid,|g| g.name.clone()));
+       
+    }
+    for (k,v) in guild_hm.iter(){
+    
+        guild_names.push(ListItem::new( v.as_ref().unwrap().as_str()));
+    };
+    app.set(guild_names);
     run_app(&mut terminal, app, ctx)?;
 
     disable_raw_mode()?;
@@ -92,16 +106,30 @@ fn run_app<B: Backend>(
                             KeyCode::Char('w') => {
                                 return Ok(());
                             }
+                    
                             _ => {}
                         }
                     }
                 }
+                KeyCode::Left => {
+                    app.items.unselect();
+                    
+                }
+                KeyCode::Up => {
+                    app.items.previous();
+                    
+                }
+                KeyCode::Down => {
+                    app.items.next();
+                    
+                }
                 _ => {}
+              
             }
         }
     }
 }
-fn ui<B: Backend>(f: &mut Frame<B>, _app: &App, ctx: &Context) {
+fn ui<B: Backend>(f: &mut Frame<B>, app: &App, ctx: &Context) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .margin(2)
@@ -133,31 +161,84 @@ fn ui<B: Backend>(f: &mut Frame<B>, _app: &App, ctx: &Context) {
 
     let mut guild_hm = HashMap::new();
     let guilds = ctx.cache.guilds();
-    let mut guild_names = vec![];
+ 
 
     for gid in guilds.iter() {
 
         guild_hm.insert(gid.0, ctx.cache.guild_field(gid,|g| g.name.clone()));
        
     }
-    for (k,v) in guild_hm.iter(){
-    
-        guild_names.push(ListItem::new( v.as_ref().unwrap().as_str()));
-    };
    
-    
-    let items = List::new(guild_names)
+   
+   
+   
+    let items = &app.items.items;
+
+    let items = List::new(items.clone())
         .block(Block::default().title("Servers").borders(Borders::ALL))
         .style(Style::default().fg(Color::White))
         .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
-        .highlight_symbol(">>");
-    f.render_widget(items, left_chunk[0]);
+        .highlight_symbol("> ");
+   // f.render_widget(items, left_chunk[0]);
+    f.render_stateful_widget(items, left_chunk[0], &mut app.items.state.clone());
 }
 
-struct App;
-impl Default for App {
-    fn default() -> App {
-        App {}
+struct StatefulList<T> {
+    state: ListState,
+    items: Vec<T>,
+}
+impl<T> StatefulList<T> {
+    fn with_items(items: Vec<T>) -> StatefulList<T> {
+        StatefulList {
+            state: ListState::default(),
+            items,
+        }
+    }
+
+    fn next(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i >= self.items.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+    }
+
+    fn previous(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.items.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+    }
+
+    fn unselect(&mut self) {
+        self.state.select(None);
+    }
+}
+
+struct App<'a>{
+    items: StatefulList<ListItem<'a>>
+}
+impl<'a> App<'a> {
+    fn default() -> App<'a> {
+        App {
+            items: StatefulList::with_items(vec![])
+        }
+    }
+    fn set(&mut self,items: Vec<ListItem<'a>>){
+        self.items = StatefulList::with_items(items);
     }
 }
 
