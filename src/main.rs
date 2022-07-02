@@ -77,14 +77,14 @@ fn tui(ctx: Context) -> Result<(), io::Error> {
     for gid in guilds.iter() {
 
         guild_hm.insert(gid.0, ctx.cache.guild_field(gid,|g| g.name.clone()));
-       
+      
     }
     for (k,v) in guild_hm.iter(){
     
         guild_names.push(ListItem::new( v.as_ref().unwrap().as_str()));
     };
     app.set(guild_names);
-    run_app(&mut terminal, app, ctx)?;
+    run_app(&mut terminal,app,&guild_hm, ctx)?;
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
@@ -94,9 +94,12 @@ fn tui(ctx: Context) -> Result<(), io::Error> {
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
     mut app: App,
+    guild_hm: &HashMap<u64,Option<String>>,
     ctx: Context,
 ) -> io::Result<()> {
     loop {
+        
+
         terminal.draw(|f| ui(f, &app, &ctx))?;
         if let Event::Key(key) = event::read()? {
             match key.code {
@@ -150,7 +153,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App, ctx: &Context) {
     //             .borders(Borders::all());
     // f.render_widget(server_list,left_chunk[0]);
 
-    let channel_list = Block::default().title("title").borders(Borders::all());
+    let channel_list = Block::default().title("Channels").borders(Borders::all());
     f.render_widget(channel_list, left_chunk[1]);
 
     let block = Block::default().title("Discord").borders(Borders::all());
@@ -161,19 +164,22 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App, ctx: &Context) {
 
     let mut guild_hm = HashMap::new();
     let guilds = ctx.cache.guilds();
- 
+    let mut guild_vec = vec![]; 
 
     for gid in guilds.iter() {
 
         guild_hm.insert(gid.0, ctx.cache.guild_field(gid,|g| g.name.clone()));
-       
+        guild_vec.push(gid.0);
     }
-   
-   
-   
-   
+    let mut guild_id = vec![];
+    
+     for (k,v) in guild_hm.iter(){
+    
+        guild_id.push(ListItem::new( v.as_ref().unwrap().as_str()));
+    };
+    
+          
     let items = &app.items.items;
-
     let items = List::new(items.clone())
         .block(Block::default().title("Servers").borders(Borders::ALL))
         .style(Style::default().fg(Color::White))
@@ -181,7 +187,34 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App, ctx: &Context) {
         .highlight_symbol("> ");
    // f.render_widget(items, left_chunk[0]);
     f.render_stateful_widget(items, left_chunk[0], &mut app.items.state.clone());
+    //TODO: the code below panicks because unwrap might return a None value
+    let items = &app.items.state.selected().unwrap_or(0);
+    let items = *items as u64;
+    let mut index = 0;
+    for (k,v) in guild_hm.iter(){
+        if(index == items){
+            index = *k; 
+
+        }
+        index += 1;
+
+    }
+    let channels = ctx.cache.guild_channels(index); 
+//    let items = 
+//
+//
+//    let items = List::new(items.clone())
+//        .block(Block::default().title("Servers").borders(Borders::ALL))
+//        .style(Style::default().fg(Color::White))
+//        .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
+//        .highlight_symbol("> ");
+//   // f.render_widget(items, left_chunk[0]);
+//    f.render_stateful_widget(items, left_chunk[0], &mut app.items.state.clone());
+//
+//
 }
+
+
 
 struct StatefulList<T> {
     state: ListState,
@@ -227,7 +260,6 @@ impl<T> StatefulList<T> {
         self.state.select(None);
     }
 }
-
 struct App<'a>{
     items: StatefulList<ListItem<'a>>
 }
