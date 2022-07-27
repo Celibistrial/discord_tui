@@ -19,7 +19,7 @@ use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use std::thread;
 use std::time::Duration;
-
+mod discord_client;
 
 struct Handler;
 #[async_trait]
