@@ -20,16 +20,19 @@ use tui::{
 };
 
 struct App<'a> {
-    info: (StatefulList<ListItem<'a>>,),
+    //(Server list, cursor pos,channels list state)
+    //cursor pos can be 0 or 1 (0 is servers , 1 is channels )
+    info: (StatefulList<ListItem<'a>>, u64,ListState),
+
 }
 impl<'a> App<'a> {
     fn default() -> App<'a> {
         App {
-            info: (StatefulList::with_items(vec![]),),
+            info: (StatefulList::with_items(vec![]), 0,ListState::default()),
         }
     }
     fn set(&mut self, info: (StatefulList<ListItem<'a>>,)) {
-        self.info = info;
+        self.info = (info.0, 0,ListState::default());
     }
 }
 
@@ -44,8 +47,8 @@ impl<T> StatefulList<T> {
             items,
         }
     }
-
     fn next(&mut self) {
+        //tttttt
         let i = match self.state.selected() {
             Some(i) => {
                 if i >= self.items.len() - 1 {
@@ -78,7 +81,7 @@ impl<T> StatefulList<T> {
     }
 }
 
-pub  fn tui(ctx: Context) -> Result<(), io::Error> {
+pub fn tui(ctx: Context) -> Result<(), io::Error> {
     //terminal setup
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -114,8 +117,9 @@ fn run_app<B: Backend>(
     guild_hm: &HashMap<u64, Option<String>>,
     ctx: Context,
 ) -> io::Result<()> {
+    app.info.0.next();
     loop {
-       terminal.draw(|f| ui(f, &app, &ctx))?;
+        terminal.draw(|f| ui(f, &app, &ctx))?;
         if let Event::Key(key) = event::read()? {
             match key.code {
                 KeyCode::Char('`') => {
@@ -129,15 +133,20 @@ fn run_app<B: Backend>(
                         }
                     }
                 }
+                KeyCode::Up => match app.info.1 {
+                    0 => app.info.0.previous(),
+                    _ => {}
+                },
+                KeyCode::Down => match app.info.1 {
+                    0 => app.info.0.next(),
+                    _ => {}
+                },
                 KeyCode::Left => {
-                    app.info.0.unselect();
-                }
-                KeyCode::Up => {
-                    app.info.0.previous();
-                }
-                KeyCode::Down => {
-                    app.info.0.next();
-                }
+                    app.info.1 = 0 
+                },
+                KeyCode::Right  => {
+                    app.info.1 = 1 
+                },
                 _ => {}
             }
         }
@@ -194,24 +203,30 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App, ctx: &Context) {
     let items = &app.info.0.state.selected().unwrap_or(0);
     let items = *items as u64;
     let mut index = 0;
-    for (k, v) in guild_hm.iter() {
+    for (k) in guild_vec.into_iter() {
         if (index == items) {
-            index = *k;
+            index = k;
+            break;
         }
         index += 1;
     }
     let mut channel_list_state = ListState::default();
 
-    //TODO get list of channels in a guild https://docs.rs/serenity/latest/serenity/model/id/struct.GuildId(index).channels(&ctx.http).await; 
     let mut channel_vec = vec![];
     let channel_list = ctx.cache.guild_channels(index).unwrap();
-    for (k,v) in channel_list.into_iter(){
+    for (k, v) in channel_list.into_iter() {
         channel_vec.push(ListItem::new(v.name));
     }
+    // let channel_list = ctx.cache.guild(index).unwrap().channels;
+    // let channel_list = channel_list
+    //     .values()
+    //     .map(Clone::clone)
+    //     .collect::<Vec<GuildChannel>>();
+    // channels.sort_by_key(|c| c.position);
     let channel_list = List::new(channel_vec)
         .block(Block::default().title("Channels").borders(Borders::ALL))
         .style(Style::default().fg(Color::White))
         .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
         .highlight_symbol("> ");
-    f.render_stateful_widget(channel_list, left_chunk[1], &mut channel_list_state);
+    f.render_stateful_widget(channel_list, left_chunk[1], &mut app.info.2.clone());
 }
