@@ -21,6 +21,7 @@ use tui::{
 
 struct App<'a> {
     //(Server list, cursor pos,channels list state)
+    //ttt
     //cursor pos can be 0 or 1 (0 is servers , 1 is channels )
     info: (StatefulList<ListItem<'a>>, u64,ListState),
 
