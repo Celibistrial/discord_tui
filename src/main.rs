@@ -1,10 +1,9 @@
 use serenity::async_trait;
 use serenity::model::gateway::Ready;
-use serenity::model::{channel::Message, guild};
+use serenity::model::channel::Message;
 use serenity::prelude::*;
 use std::env;
-use std::{io, sync::Arc};
-use std::{thread, time};
+use std::thread;
 
 mod discord_client;
 
@@ -22,14 +21,17 @@ impl EventHandler for Handler {
     async fn cache_ready(
         &self,
         ctx: serenity::prelude::Context,
-        vec: Vec<serenity::model::id::GuildId>,
+        _vec: Vec<serenity::model::id::GuildId>,
     ) {
         thread::spawn(move || {
-            discord_client::tui(ctx);
+            let err = discord_client::tui(ctx);
+            if err.is_err(){
+                println!("Unable to start TUI thread {:?}",err);
+            }
         });
     }
 
-    async fn ready(&self, ctx: Context, ready: Ready) {
+    async fn ready(&self, _ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
     }
 }
@@ -37,10 +39,6 @@ impl EventHandler for Handler {
 #[tokio::main]
 async fn main() {
     let token = env::var("BOT_TOKEN").expect("Expected a token in the environment");
-    let intents = GatewayIntents::GUILD_MESSAGES
-        | GatewayIntents::GUILDS
-        | GatewayIntents::DIRECT_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT;
     let intents = GatewayIntents::all();
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler)
